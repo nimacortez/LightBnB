@@ -59,19 +59,22 @@ exports.getUserWithId = getUserWithId;
  * @param {{name: string, password: string, email: string}} user
  * @return {Promise<{}>} A promise to the user.
  */
-const addUser =  function(user) {
-  const text = `
-  INSERT INTO users (name, email, password)
-  VALUES ($1, $2, $3) RETURNING *;`;
-  const values = [userName, userEmail, userPwd];
-  return pool.query(text, values)
-    .then(res => {
-      return res.rows[0];
+const addUser = function (user) {
+  return pool
+    .query(
+      `INSERT INTO users (name, email, password)
+  VALUES($1, $2, $3) RETURNING *`,
+      [user.name, user.email, user.password]
+    ).then((result) => {
+      return result.rows[0];
     })
-    .catch(err => {
-      return console.log('query error:', err);
-    })
-}
+    .catch((err) => {
+      console.log('query error', err);
+      return null;
+    });
+};
+
+
 
 exports.addUser = addUser;
 
@@ -125,25 +128,21 @@ const getAllProperties = function (options, limit = 10) {
     queryString += `WHERE city LIKE $${queryParams.length} `;
   } if (options.minimum_price_per_night) {
     queryParams.push(options.minimum_price_per_night);
-    if (queryParams.length >= 2) {
+    if (queryParams.length >= 200) {
       queryString += `AND cost_per_night > $${queryParams.length} `;
     } else {
       queryString += `WHERE cost_per_night > $${queryParams.length} `;
     }
   } if (options.maximum_price_per_night) {
     queryParams.push(options.maximum_price_per_night);
-    if (queryParams.length >= 2) {
+    if (queryParams.length >= 200) {
       queryString += `AND cost_per_night < $${queryParams.length} `;
     } else {
       queryString += `WHERE cost_per_night < $${queryParams.length} `;
     }
-  } if (options.minimum_rating > 0) {
-    queryParams.push(options.minimum_rating);
-    if (queryParams.length >= 2) {
-      queryString += `AND rating > $${queryParams.length}`;
-    } else {
-      queryString += `WHERE rating > $${queryParams.length}`;
-    }
+  } if (options.minimum_rating) {
+    queryParams.push(`${options.minimum_rating}`);
+    queryString += `AND (SELECT AVG(property_reviews.rating) FROM property_reviews WHERE property_id = properties.id) >= $${queryParams.length}`;
   };
 
   // 4
